@@ -1,7 +1,7 @@
 {
-  "name": "tiktok-follower-bot-discord",
+  "name": "tiktok-instagram-channel-updater",
   "version": "1.0.0",
-  "description": "Discord bot that posts TikTok and Instagram follower counts and provides /sync social command",
+  "description": "Discord bot that updates separate channel names for TikTok and Instagram follower counts and provides /sync social command",
   "main": "src/index.js",
   "type": "module",
   "engines": {

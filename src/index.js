@@ -4,9 +4,12 @@ import cron from 'node-cron';
 import syncCommand from './commands/sync.js';
 import { fetchFollowerCount } from './services/tiktok.js';
 import { fetchInstagramFollowerCount } from './services/instagram.js';
+import { formatFollowersCompact } from './utils/format.js';
+import { setChannelNameSafe } from './utils/channel.js';
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID;
+const CHANNEL_ID_TIKTOK = process.env.CHANNEL_ID_TIKTOK;
+const CHANNEL_ID_INSTAGRAM = process.env.CHANNEL_ID_INSTAGRAM;
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 const INSTAGRAM_USERNAME = process.env.INSTAGRAM_USERNAME;
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 */4 * * *';
@@ -17,7 +20,7 @@ if (!DISCORD_TOKEN) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+  intents: [GatewayIntentBits.Guilds]
 });
 
 client.commands = new Map();
@@ -54,9 +57,12 @@ client.on(Events.InteractionCreate, async interaction => {
       fetchFollowerCount,
       fetchInstagramFollowerCount,
       client,
-      CHANNEL_ID,
+      CHANNEL_ID_TIKTOK,
+      CHANNEL_ID_INSTAGRAM,
       TIKTOK_USERNAME,
-      INSTAGRAM_USERNAME
+      INSTAGRAM_USERNAME,
+      formatFollowersCompact,
+      setChannelNameSafe
     });
   } catch (err) {
     console.error('Command Fehler:', err);
@@ -69,75 +75,58 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 async function scheduledUpdate(reason = '') {
-  const parts = [];
-
-  if (TIKTOK_USERNAME) {
+  // TikTok-Channel updaten
+  if (TIKTOK_USERNAME && CHANNEL_ID_TIKTOK) {
     try {
       const tFollowers = await fetchFollowerCount(TIKTOK_USERNAME);
-      parts.push(`TikTok: ${tFollowers.toLocaleString()}`);
-      if (CHANNEL_ID) {
-        try {
-          const channel = await client.channels.fetch(CHANNEL_ID);
-          if (channel && channel.isTextBased()) {
-            await channel.send(`TikTok: @${TIKTOK_USERNAME} — Follower: ${tFollowers.toLocaleString()}`);
-          }
-        } catch (e) {
-          console.warn('Fehler beim Senden in TikTok-Kanal:', e);
-        }
-      }
+      const name = `tiktok-${formatFollowersCompact(tFollowers)}`;
+      await setChannelNameSafe(client, CHANNEL_ID_TIKTOK, name, `Automated update (${reason})`);
+      console.log('TikTok-Channel-Name aktualisiert zu:', name);
     } catch (err) {
-      console.error('TikTok update failed:', err);
-      if (CHANNEL_ID) {
-        try {
-          const channel = await client.channels.fetch(CHANNEL_ID);
-          if (channel && channel.isTextBased()) {
-            await channel.send(`Fehler beim Abrufen der TikTok-Follower: ${err.message || err}`);
-          }
-        } catch (e) {}
-      }
-    }
-  }
-
-  if (INSTAGRAM_USERNAME) {
-    try {
-      const iFollowers = await fetchInstagramFollowerCount(INSTAGRAM_USERNAME);
-      parts.push(`IG: ${iFollowers.toLocaleString()}`);
-      if (CHANNEL_ID) {
-        try {
-          const channel = await client.channels.fetch(CHANNEL_ID);
-          if (channel && channel.isTextBased()) {
-            await channel.send(`Instagram: @${INSTAGRAM_USERNAME} — Follower: ${iFollowers.toLocaleString()}`);
-          }
-        } catch (e) {
-          console.warn('Fehler beim Senden in Instagram-Kanal:', e);
-        }
-      }
-    } catch (err) {
-      console.error('Instagram update failed:', err);
-      if (CHANNEL_ID) {
-        try {
-          const channel = await client.channels.fetch(CHANNEL_ID);
-          if (channel && channel.isTextBased()) {
-            await channel.send(`Fehler beim Abrufen der Instagram-Follower: ${err.message || err}`);
-          }
-        } catch (e) {}
-      }
-    }
-  }
-
-  if (parts.length > 0) {
-    try {
-      const activityText = parts.join(' | ');
-      await client.user.setPresence({
-        activities: [{ name: activityText, type: ActivityType.Watching }],
-        status: 'online'
-      });
-      console.log('Presence gesetzt:', activityText);
-    } catch (err) {
-      console.warn('Could not set presence:', err);
+      console.error('TikTok update failed (channel):', err);
     }
   } else {
-    console.log('Keine Plattformen konfiguriert; überspringe Presence/Post.');
+    console.log('TikTok: Username oder CHANNEL_ID_TIKTOK nicht konfiguriert; übersprungen.');
+  }
+
+  // Instagram-Channel updaten
+  if (INSTAGRAM_USERNAME && CHANNEL_ID_INSTAGRAM) {
+    try {
+      const iFollowers = await fetchInstagramFollowerCount(INSTAGRAM_USERNAME);
+      const name = `ig-${formatFollowersCompact(iFollowers)}`;
+      await setChannelNameSafe(client, CHANNEL_ID_INSTAGRAM, name, `Automated update (${reason})`);
+      console.log('Instagram-Channel-Name aktualisiert zu:', name);
+    } catch (err) {
+      console.error('Instagram update failed (channel):', err);
+    }
+  } else {
+    console.log('Instagram: Username oder CHANNEL_ID_INSTAGRAM nicht konfiguriert; übersprungen.');
+  }
+
+  // Optional: kombiniertes Presence (informativ)
+  try {
+    const presenceParts = [];
+    if (TIKTOK_USERNAME) {
+      try {
+        const tFollowers = await fetchFollowerCount(TIKTOK_USERNAME);
+        presenceParts.push(`TikTok: ${formatFollowersCompact(tFollowers)}`);
+      } catch {}
+    }
+    if (INSTAGRAM_USERNAME) {
+      try {
+        const iFollowers = await fetchInstagramFollowerCount(INSTAGRAM_USERNAME);
+        presenceParts.push(`IG: ${formatFollowersCompact(iFollowers)}`);
+      } catch {}
+    }
+    if (presenceParts.length > 0) {
+      await client.user.setPresence({
+        activities: [{ name: presenceParts.join(' | '), type: ActivityType.Watching }],
+        status: 'online'
+      });
+    }
+  } catch (err) {
+    // non-critical
+    console.warn('Presence konnte nicht gesetzt werden:', err);
   }
 }
 
