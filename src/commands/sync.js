@@ -53,8 +53,11 @@ async function execute(interaction, context) {
           const newName = `tiktok-${compact}`;
           await context.setChannelNameSafe(context.client, context.CHANNEL_ID_TIKTOK, newName, `Manual /sync social by ${interaction.user.tag}`);
           results.push({ platform: 'tiktok', username: tUser, followers, newName });
+          // Log
+          await context.sendLog(context.client, context.LOG_CHANNEL_ID, `🔧 Manuell: TikTok aktualisiert: @${tUser} — ${followers.toLocaleString()} Follower\nNeuer Channel-Name: ${newName} (ausgeführt von ${interaction.user.tag})`);
         } catch (err) {
           results.push({ platform: 'tiktok', error: err.message || String(err) });
+          await context.sendLog(context.client, context.LOG_CHANNEL_ID, `⚠️ Manuell: TikTok-Update fehlgeschlagen für @${tUser}: ${err.message || err} (ausgeführt von ${interaction.user.tag})`);
         }
       }
     }
@@ -73,8 +76,10 @@ async function execute(interaction, context) {
           const newName = `ig-${compact}`;
           await context.setChannelNameSafe(context.client, context.CHANNEL_ID_INSTAGRAM, newName, `Manual /sync social by ${interaction.user.tag}`);
           results.push({ platform: 'instagram', username: iUser, followers, newName });
+          await context.sendLog(context.client, context.LOG_CHANNEL_ID, `🔧 Manuell: Instagram aktualisiert: @${iUser} — ${followers.toLocaleString()} Follower\nNeuer Channel-Name: ${newName} (ausgeführt von ${interaction.user.tag})`);
         } catch (err) {
           results.push({ platform: 'instagram', error: err.message || String(err) });
+          await context.sendLog(context.client, context.LOG_CHANNEL_ID, `⚠️ Manuell: Instagram-Update fehlgeschlagen für @${iUser}: ${err.message || err} (ausgeführt von ${interaction.user.tag})`);
         }
       }
     }
@@ -90,6 +95,7 @@ async function execute(interaction, context) {
   } catch (err) {
     console.error('Fehler bei /sync social:', err);
     await interaction.editReply({ content: `Fehler: ${err.message || String(err)}` });
+    await context.sendLog(context.client, context.LOG_CHANNEL_ID, `⚠️ Fehler bei /sync social: ${err.message || err}`);
   }
 }
 

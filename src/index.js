@@ -6,10 +6,12 @@ import { fetchFollowerCount } from './services/tiktok.js';
 import { fetchInstagramFollowerCount } from './services/instagram.js';
 import { formatFollowersCompact } from './utils/format.js';
 import { setChannelNameSafe } from './utils/channel.js';
+import { sendLog } from './utils/logger.js';
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const CHANNEL_ID_TIKTOK = process.env.CHANNEL_ID_TIKTOK;
 const CHANNEL_ID_INSTAGRAM = process.env.CHANNEL_ID_INSTAGRAM;
+const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID;
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 const INSTAGRAM_USERNAME = process.env.INSTAGRAM_USERNAME;
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 */4 * * *';
@@ -29,11 +31,23 @@ client.commands.set(syncCommand.data.name, syncCommand);
 client.once(Events.ClientReady, async () => {
   console.log(`Eingeloggt als ${client.user.tag}`);
 
+  // Send "online" log message
+  try {
+    const configured = [];
+    if (TIKTOK_USERNAME) configured.push(`TikTok: @${TIKTOK_USERNAME}`);
+    if (INSTAGRAM_USERNAME) configured.push(`Instagram: @${INSTAGRAM_USERNAME}`);
+    const cfgText = configured.length > 0 ? configured.join(' | ') : 'keine Plattformen konfiguriert';
+    await sendLog(client, LOG_CHANNEL_ID, `✅ Bot ist online — ${new Date().toISOString()}\nKonfiguration: ${cfgText}`);
+  } catch (err) {
+    console.warn('Konnte Online-Log nicht senden:', err);
+  }
+
   // Einmal beim Start ausführen
   try {
     await scheduledUpdate('Startup');
   } catch (err) {
     console.error('Fehler beim Startup-Update:', err);
+    await sendLog(client, LOG_CHANNEL_ID, `⚠️ Fehler beim Startup-Update: ${err.message || err}`);
   }
 
   // Cron: gemäß CRON_SCHEDULE
@@ -43,6 +57,7 @@ client.once(Events.ClientReady, async () => {
       await scheduledUpdate('Scheduled update');
     } catch (err) {
       console.error('Fehler beim geplanten Abruf:', err);
+      await sendLog(client, LOG_CHANNEL_ID, `⚠️ Fehler beim geplanten Abruf: ${err.message || err}`);
     }
   });
 });
@@ -59,10 +74,12 @@ client.on(Events.InteractionCreate, async interaction => {
       client,
       CHANNEL_ID_TIKTOK,
       CHANNEL_ID_INSTAGRAM,
+      LOG_CHANNEL_ID,
       TIKTOK_USERNAME,
       INSTAGRAM_USERNAME,
       formatFollowersCompact,
-      setChannelNameSafe
+      setChannelNameSafe,
+      sendLog
     });
   } catch (err) {
     console.error('Command Fehler:', err);
@@ -71,6 +88,7 @@ client.on(Events.InteractionCreate, async interaction => {
     } else {
       await interaction.reply({ content: 'Fehler beim Ausführen.', ephemeral: true });
     }
+    await sendLog(client, LOG_CHANNEL_ID, `⚠️ Fehler beim Ausführen eines Commands: ${err.message || err}`);
   }
 });
 
@@ -82,8 +100,10 @@ async function scheduledUpdate(reason = '') {
       const name = `tiktok-${formatFollowersCompact(tFollowers)}`;
       await setChannelNameSafe(client, CHANNEL_ID_TIKTOK, name, `Automated update (${reason})`);
       console.log('TikTok-Channel-Name aktualisiert zu:', name);
+      await sendLog(client, LOG_CHANNEL_ID, `🔄 TikTok aktualisiert: @${TIKTOK_USERNAME} — ${tFollowers.toLocaleString()} Follower\nNeuer Channel-Name: ${name}`);
     } catch (err) {
       console.error('TikTok update failed (channel):', err);
+      await sendLog(client, LOG_CHANNEL_ID, `⚠️ TikTok-Update fehlgeschlagen für @${TIKTOK_USERNAME}: ${err.message || err}`);
     }
   } else {
     console.log('TikTok: Username oder CHANNEL_ID_TIKTOK nicht konfiguriert; übersprungen.');
@@ -96,8 +116,10 @@ async function scheduledUpdate(reason = '') {
       const name = `ig-${formatFollowersCompact(iFollowers)}`;
       await setChannelNameSafe(client, CHANNEL_ID_INSTAGRAM, name, `Automated update (${reason})`);
       console.log('Instagram-Channel-Name aktualisiert zu:', name);
+      await sendLog(client, LOG_CHANNEL_ID, `🔄 Instagram aktualisiert: @${INSTAGRAM_USERNAME} — ${iFollowers.toLocaleString()} Follower\nNeuer Channel-Name: ${name}`);
     } catch (err) {
       console.error('Instagram update failed (channel):', err);
+      await sendLog(client, LOG_CHANNEL_ID, `⚠️ Instagram-Update fehlgeschlagen für @${INSTAGRAM_USERNAME}: ${err.message || err}`);
     }
   } else {
     console.log('Instagram: Username oder CHANNEL_ID_INSTAGRAM nicht konfiguriert; übersprungen.');
@@ -132,5 +154,6 @@ async function scheduledUpdate(reason = '') {
 
 client.login(DISCORD_TOKEN).catch(err => {
   console.error('Login fehlgeschlagen:', err);
+  // try to log into LOG_CHANNEL_ID if possible? client not logged => cannot
   process.exit(1);
 });
