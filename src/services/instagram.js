@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import { fetch } from 'undici';
 import cheerio from 'cheerio';
 
 // Versucht mehrere Strategien, um Instagram-Follower zu bekommen.

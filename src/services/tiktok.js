@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import { fetch } from 'undici';
 import cheerio from 'cheerio';
 
 // Einfacher Scraper: versucht mehrere Strategien, um die Follower-Zahl zu parsen.
