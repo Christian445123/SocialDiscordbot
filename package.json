@@ -1,0 +1,24 @@
+{
+  "name": "tiktok-follower-bot-discord",
+  "version": "1.0.0",
+  "description": "Discord bot that posts TikTok and Instagram follower counts and provides /sync social command",
+  "main": "src/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=16.9.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy-commands": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.11.0",
+    "@discordjs/builders": "^1.5.0",
+    "@discordjs/rest": "^1.4.0",
+    "discord-api-types": "^0.37.39",
+    "dotenv": "^16.0.0",
+    "node-cron": "^3.0.2",
+    "node-fetch": "^3.4.0",
+    "cheerio": "^1.0.0-rc.12"
+  }
+}
